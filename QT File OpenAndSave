@@ -1,0 +1,36 @@
+void TextEditWin::on_openAction_triggered()
+{
+    QString filepath=QFileDialog::getOpenFileName(this);
+    ui->statusbar->showMessage(filepath);
+    QFile file(filepath);
+    if(!file.open(QIODevice::ReadWrite))//读写方式打开
+    {
+        ui->statusbar->showMessage("打开文件失败");
+        return;
+    }
+    QString msg=file.readAll();
+    ui->textEdit->setText(QString(msg.toUtf8()));
+    file.close();
+}
+
+void TextEditWin::on_saveAction_triggered()
+{
+    //获取保存路径
+    QString savepath=QFileDialog::getSaveFileName(this);
+    QFile file(savepath);
+    if(!file.open(QIODevice::ReadWrite))//读写方式打开
+    {
+        ui->statusbar->showMessage("打开文件失败");
+        return;
+    }
+     QString msg=ui->textEdit->toPlainText();  //把控件中所有的内容读取出来
+     //写文件
+     file.write(msg.toUtf8());    //msg.toUtf8()：返回utf8编码的一串数字
+     file.flush();
+     file.close();
+}
+void TextEditWin::on_quitAction_triggered()
+{
+    //退出
+    this->close();
+}
