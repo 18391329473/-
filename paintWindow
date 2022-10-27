@@ -1,0 +1,37 @@
+void Widget::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);         //定义一个画笔操作器
+
+    painter.setRenderHint(QPainter::Antialiasing);          //让直线变得更加光滑（没有）
+
+    painter.setBrush(QColor(255,0,0));  //设置画刷为绿色；
+    painter.drawRect(rect());       //画刷刷至整个屏幕上   rect 矩形
+/*
+    QPen pen;   //创建画笔
+    pen.setColor(QColor(0,255,0));
+    pen.setWidth(10);
+    pen.setStyle(Qt::DashDotDotLine);
+    painter.setPen(pen);
+    painter.drawLine(0,0,width(),height());
+
+
+    QPen pen1;
+    pen1.setWidth(10);
+    pen1.setColor(QColor(0,0,255));
+    pen1.setStyle(Qt::DotLine);
+    painter.setPen((pen1));
+    painter.drawLine(width(),0,0,height());
+*/
+//    QBrush brush=QBrush(QColor(0,0,255));
+//    painter.setBrush(brush);
+
+    QLinearGradient linear=QLinearGradient(450,150,150,150);   //渐变色
+    linear.setColorAt(0,Qt::red);
+    linear.setColorAt(1,Qt::blue);
+    painter.setBrush(linear);
+
+
+    //painter.setPen(Qt::NoPen);   //取消黑色画笔边框
+    painter.drawRect(200,200,300,300);      //起始位置，和长宽
+
+}
