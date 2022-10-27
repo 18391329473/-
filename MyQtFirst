@@ -1,0 +1,50 @@
+Widget::Widget(QWidget *parent)
+    : QWidget(parent)
+{
+    //设置窗口标题
+    this->setWindowTitle(QStringLiteral("窗口标题"));
+    //设置窗口图标
+    this->setWindowIcon(QIcon("C:/Users/imycz/Desktop/icon.webp"));     //记得切换转义字符 ‘/’
+    //设置窗口大小
+      this->resize(640,480);
+   // this->setMinimumSize(640,480);  //设置窗口的最小尺寸
+   // this->setFixedSize(640,480);      //设置窗口的固定尺寸，不能改变窗口大小
+
+
+    //创建按钮
+    QPushButton *btn=new QPushButton(QStringLiteral("按钮1"),this);        //将按钮存放在堆区
+   // btn->setParent(this);           //给按钮设置父对象，让按钮显示在父窗口上
+     btn->show();         //显示按钮
+    QPushButton *btnCai=new QPushButton(QStringLiteral("顶顶顶顶的"));
+
+    //指定了父对象，就不需要通过show方法显示了
+    btnCai->setParent(this);
+    btnCai->move(200,0);
+  //  btnCai->hide();    //隐藏按钮
+
+
+  /*  connect(const QObject *sender, const char *signal,
+            const QObject *receiver, const char *method
+
+        sender：发送消息的对象
+        signal:发送消息的类型（信号）
+        receiver：接受消息的对象
+        method：如何处理消息（槽函数）
+*/
+
+  //  connect(btn,&QPushButton::clicked,btnCai,&QPushButton::hide);
+    connect(btn,&QPushButton::clicked,btnCai,[=](){
+
+         static bool flag=true; //静态变量可以保留上次函数调用结束时的值
+        if(flag)
+        {
+             btnCai->hide();
+
+        }
+       else{
+            btnCai->show();
+            btnCai->setText(QStringLiteral("我是按钮啊"));
+        }
+         flag=!flag;
+    });
+}
