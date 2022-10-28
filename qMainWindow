@@ -1,0 +1,12 @@
+ QMenuBar *mb= this->menuBar();
+    //添加菜单
+   QMenu* menuFile=mb->addMenu(QStringLiteral("文件"));
+   QMenu* menuEdit=mb->addMenu(QStringLiteral("编辑"));
+    //菜单里面添加选项
+   QAction* actionNew=menuFile->addAction(QStringLiteral("新建"));
+   QAction* actionOpen=menuFile->addAction(QStringLiteral("打开"));
+
+   menuFile->addSeparator();//添加分割符
+   //添加二级菜单
+   QMenu* menuRecent=menuFile->addMenu(QStringLiteral("最近打开的文件"));
+   menuRecent->addAction(QStringLiteral("1.txt"));
