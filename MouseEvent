@@ -1,0 +1,58 @@
+oid Widget::mousePressEvent(QMouseEvent *event)
+{
+    if(event->button()==Qt::LeftButton)     //按下鼠标左键
+    {
+        QCursor cursor;
+        cursor.setShape(Qt::ClosedHandCursor);
+        QApplication::setOverrideCursor(cursor);    //使用新的光标覆盖
+        p=event->globalPos()-pos();
+        qDebug()<<QStringLiteral("鼠标距离")<<p;
+    }
+    else if(event->button()==Qt::RightButton)
+    {
+        QCursor cursor(QPixmap("C:/Users/imycz/Desktop/pig.jpg"));
+        QApplication::setOverrideCursor(cursor);
+    }
+}
+void Widget::mouseReleaseEvent(QMouseEvent *event)
+{
+   // Q_UNUSED(event);
+    QApplication::restoreOverrideCursor();
+}
+void Widget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if(event->button()==Qt::LeftButton)
+    {
+        if(windowState()!=Qt::WindowFullScreen)
+        {
+            setWindowState(Qt::WindowFullScreen);       //设置窗口全屏
+        }
+        else{
+            setWindowState(Qt::WindowNoState);      //使全屏缩小
+        }
+    }
+}
+void Widget::mouseMoveEvent(QMouseEvent *event)
+{
+ //   qDebug()<<QStringLiteral("鼠标移动时间")<<event->pos();
+   // p=event->pos();
+ //   update();
+
+/*  鼠标移动过程中窗口也跟着移动*/
+   if(event->buttons()&Qt::LeftButton)
+   {
+       QPoint temp;
+       temp=event->globalPos()-p;  //移动之后的光标位置-移动之前的光标位置。使得鼠标移动多少距离窗口就移动多少距离
+       move(temp);
+   }
+}
+void Widget::wheelEvent(QWheelEvent *event)
+{
+     if(event->delta()>0)   //delta函数控制滑轮，往前滑返回一个正值，往后滑返回一个负值
+     {
+         ui->textEdit->zoomIn();    //放大
+     }
+     else{
+         ui->textEdit->zoomOut();   //缩小
+     }
+}
