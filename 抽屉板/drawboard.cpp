@@ -1,70 +1,71 @@
-#include "drawboard.h"
-#include<QPainter>
-drawboard::drawboard(QWidget *parent) : QWidget(parent)
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include<QLabel>
+#include<QComboBox>
+#include<QToolBar>
+#include<QPushButton>
+#include<QColorDialog>
+#include<QSpinBox>
+#include<QMainWindow>
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
 {
-    pix=new QPixmap(900,600);
-    pix->fill(Qt::white);
+    ui->setupUi(this);
 
-    fpix=new QPixmap(900,600);
-    fpix->fill(Qt::white);
-    style=QStringLiteral("直线");
 
-    width=1;
+    this->setWindowTitle(QStringLiteral("欢迎来到Ycz的画板"));
+    this->setWindowIcon(QIcon(":/pig.jpg"));
+
+    this->resize(900,600);
+    QLabel *lab=new QLabel(QStringLiteral("线型 "),this);
+    QComboBox *cmb=new QComboBox(lab);
+    cmb->addItem(QStringLiteral("直线"));
+    cmb->addItem(QStringLiteral("曲线"));
+    cmb->addItem(QStringLiteral("矩形"));
+    cmb->addItem(QStringLiteral("椭圆"));
+
+
+    ui->toolBar->addWidget(lab);
+    ui->toolBar->addWidget(cmb);
+    QLabel *lab1=new QLabel(QStringLiteral(" 线宽 "),this);
+    QSpinBox *sb=new QSpinBox(lab1);
+    ui->toolBar->addWidget(lab1);
+    ui->toolBar->addWidget(sb);
+
+    ui->toolBar->addSeparator();
+    QPushButton *color=new QPushButton(QStringLiteral("调色板"));
+    ui->toolBar->addWidget(color);
+   // ui->toolBar->addAction(QStringLiteral("直线"));
+    ui->toolBar->addSeparator();
+    QPushButton *clear=new QPushButton(QStringLiteral("清空"));
+    ui->toolBar->addWidget(clear);
+
+    drawboard *d=new drawboard;
+    this->setCentralWidget(d);
+
+    //线型
+    connect(cmb,&QComboBox::currentTextChanged,[=](QString text){
+        d->style=text;
+    });
+
+    //线宽
+   // connect(sb,QSpinBox::valueChanged,)   valueChanged函数有重载，因此选择指针
+    void (QSpinBox:: *p)(int i)=&QSpinBox::valueChanged;  //指针p指向该函数
+    connect(sb,p,[=](int i){
+        d->width=i;
+    });
+    //颜色
+    connect(color,&QPushButton::clicked,[=](){
+       d->c=QColorDialog::getColor();
+    });
+    connect(clear,&QPushButton::clicked,[=](){
+        d->pix->fill();
+        update();
+    });
+}
+MainWindow::~MainWindow()
+{
+    delete ui;
 }
 
-//绘图事件
-void drawboard::paintEvent(QPaintEvent *event)
-{
-    QPainter p(this);
-    p.drawPixmap(0,0,*pix);
-
-}
-
-void drawboard::mousePressEvent(QMouseEvent *event)
-{
-    start=event->pos();
-    *fpix=*pix;                     //*fpix记录刚开始的位置
-}
-void drawboard::mouseReleaseEvent(QMouseEvent *event)
-{
-//    end=event->pos();
-//    QPainter p(pix);
-//    p.drawLine(start,end);
-//    update();
-}
-void drawboard::mouseMoveEvent(QMouseEvent *event)
-{
-    if(this->style!=QStringLiteral("曲线"))   //曲线不需要画位图，因为不用清除之前的
-    {
-         *pix=*fpix;            //移动结束后将最终的位置给pix，fpix记录的是移动的过程路径
-    }                           //每次移动将fpix给pix，将之前的地图清掉，直到确定最终位置
-
-    end=event->pos();   //鼠标释放，获取到最终位置
-    QPainter p(pix);
-
-    p.setPen(QPen(this->c,this->width));    //设置颜色和宽度
-
-
-
-
-    if(this->style==QStringLiteral("直线"))
-    {
-         p.drawLine(start,end);
-    }
-    else if(this->style==QStringLiteral("曲线"))
-    {
-           p.drawLine(start,end);
-           start=end;
-           //update();
-    }
-    else if(this->style==QStringLiteral("矩形"))
-    {
-        p.drawRect(QRect(start,end));
-    }
-    else if(this->style==QStringLiteral("椭圆"))
-    {
-        p.drawEllipse(QRect(start,end));
-    }
-   // p.drawLine(start,end);
-    update();
-}
