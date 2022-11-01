@@ -1,3 +1,5 @@
+#include "drawboard.h"
+#include<QPainter>
 drawboard::drawboard(QWidget *parent) : QWidget(parent)
 {
     pix=new QPixmap(900,600);
@@ -40,7 +42,7 @@ void drawboard::mouseMoveEvent(QMouseEvent *event)
     end=event->pos();   //鼠标释放，获取到最终位置
     QPainter p(pix);
 
-    p.setPen(QPen(Qt::yellow,20));
+    p.setPen(QPen(this->c,this->width));    //设置颜色和宽度
 
 
 
