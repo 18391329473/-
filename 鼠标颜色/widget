@@ -1,0 +1,28 @@
+#include "widget.h"
+#include "ui_widget.h"
+#include<QLabel>
+Widget::Widget(QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::Widget)
+{
+    ui->setupUi(this);
+}
+
+Widget::~Widget()
+{
+    delete ui;
+}
+
+
+void Widget::on_pushButton_pressed()
+{
+    //鼠标按下，label文字改为鼠标按下
+    this->ui->label->setText(QStringLiteral("鼠标按下"));
+
+}
+
+void Widget::on_pushButton_released()
+{
+    //鼠标按下，lable文字改为鼠标松开
+    this->ui->label->setText(QStringLiteral("鼠标松开"));
+}
