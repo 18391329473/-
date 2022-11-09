@@ -1,0 +1,71 @@
+#include "mypushbutton.h"
+#include<QPainter>
+#include<QBrush>
+#include<QMouseEvent>
+#include<QDebug>
+MyPushButton::MyPushButton(QWidget *parent) : QPushButton(parent)
+{
+    mStat = MyPushButtonStat::Entered;
+}
+
+void MyPushButton::paintEvent(QPaintEvent *e)
+{
+    //画椭圆 按钮
+    QPainter painter(this);
+
+    QBrush brush;
+    brush.setStyle(Qt::SolidPattern);
+
+    switch(mStat)
+    {
+     case Normal:
+        brush.setColor(Qt::red);
+        break;       //填充红色
+     case Entered:
+        brush.setColor(Qt::green);
+        break;       //填充绿色
+     case Pressed:
+        brush.setColor(Qt::blue);
+        break;       //填充蓝色
+    }
+
+
+    painter.setBrush(brush);        //画家设置画刷
+
+    painter.drawEllipse(0,0,this->width()-1,this->height()-1);
+    //画按钮的文字
+    painter.drawText(0,0,this->width(),this->height(),Qt::AlignCenter,this->text());
+}
+
+void MyPushButton::enterEvent(QEvent *e)
+{
+    this->mStat=Entered;
+    update();
+}
+
+void MyPushButton::leaveEvent(QEvent *e)
+{
+    this->mStat=Normal;
+    update();
+}
+
+void MyPushButton::mousePressEvent(QMouseEvent *event)
+{
+    if(event->button()!=Qt::LeftButton)
+        return;
+    this->mStat=Pressed;
+    update();
+    //QPushButton::mousePressEvent(event);
+    emit this->pressed();                                    //信号依赖于事件
+}
+
+void MyPushButton::mouseReleaseEvent(QMouseEvent *event)
+{
+    if(event->button()!=Qt::LeftButton)
+        return;
+    this->mStat=Entered;
+    update();
+  //  QPushButton::mouseReleaseEvent(event);
+    emit this->released();                              //触发信号
+}
+
