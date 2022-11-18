@@ -1,0 +1,280 @@
+#include "widget.h"
+#include "ui_widget.h"
+#include <QtDebug>
+#include <QSqlError>
+#include <QString>
+#include <QMessageBox>
+#include <QPushButton>
+//#include <QTableWidget>
+#include <QFileDialog>
+#include <QFile>
+#include <QStandardItemModel>
+#include <QSqlRecord>
+
+Widget::Widget(QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::Widget)
+    , m_model(new QStandardItemModel(this))
+    ,add(new addData)
+
+{
+    ui->setupUi(this);
+
+
+    m_model->setHorizontalHeaderLabels({QStringLiteral("ID"), QStringLiteral("名称"), QStringLiteral("分数"), QStringLiteral("班级")});
+    ui->tableView->setModel(m_model);
+    ui->tableView->horizontalHeader()->setEnabled(false);
+    ui->tableView->setColumnWidth(1, 200);
+    ui->tableView->setColumnWidth(2, 200);
+    ui->tableView->setColumnWidth(3, 200);
+
+
+
+    db=QSqlDatabase::addDatabase("QSQLITE");
+
+
+
+          db.setDatabaseName("D:/Qt/Sqlist/build-sqlist-Desktop_Qt_5_9_9_MSVC2015_64bit-Debug/yc.db");
+          if (!db.open()) {
+                 QMessageBox::warning(nullptr, QObject::tr("Database Error"),
+                                      db.lastError().text());
+                 return ;
+          }
+
+
+        query=new QSqlQuery();
+      //  query->exec("DROP TABLE students");
+//        query->exec("CREATE TABLE students ("                             //创建一个students表,标题分别为id、name、score、class
+//                           "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+//                           "name VARCHAR(40) NOT NULL, "
+//                           " score INTEGER NOT NULL, "
+//                           "class VARCHAR(40) NOT NULL)");
+
+}
+
+
+void Widget::initData()
+{
+
+}
+
+
+
+Widget::~Widget()
+{
+    delete ui;
+}
+
+
+void Widget::on_showData_clicked()
+{
+
+     ui->textBrowser->clear();
+
+
+    query->exec("SELECT * FROM students");
+
+
+    int initialPos = query->at();
+    int m;
+     if (query->last()){
+             m = query->at() + 1;
+              qDebug()<<"mmmmm="<<m;
+         }else{
+             m = 0;
+               qDebug()<<"xxxx="<<m;
+         }
+     query->seek( initialPos);
+
+
+     //通过Model显示数据
+    m_model->setRowCount(m);
+    for (int i = 0; i < m_model->rowCount(); ++i) {
+        query->next();
+
+        m_model->setData(m_model->index(i, 0), query->value(0).toInt());
+        m_model->setData(m_model->index(i, 1), query->value(1).toString());
+        m_model->setData(m_model->index(i, 2), query->value(2).toInt());
+        m_model->setData(m_model->index(i, 3), query->value(3).toString());
+
+    }
+
+
+
+      query->exec("SELECT * FROM students");
+        while(query->next())
+        {
+            QString id = query->value(0).toString();
+            QString name = query->value(1).toString();
+            QString score = query->value(2).toString();
+            QString classs = query->value(3).toString();
+            QString str=id+"    "+name+"    "+score+"    "+ classs;
+            ui->textBrowser->append(str);
+            qDebug()<<id<<name<<score<<classs<<"----------------------------------------------------------";
+        }
+}
+
+
+void Widget::on_delData_clicked()
+{
+    ui->textBrowser->clear();
+  //  ui->tableView.append
+
+
+
+
+
+//      //    m=query->lastInsertId().toInt();
+
+
+  //   query->exec(QString("DELETE FROM students WHERE id=%1").arg(n));
+        query->exec(QString("DELETE FROM students WHERE id = %1").arg("(select id from students limit 1)"));
+
+     query->exec("SELECT * FROM students");
+    while(query->next())
+    {
+        QString id = query->value(0).toString();
+        QString name = query->value(1).toString();
+        QString score = query->value(2).toString();
+        QString classs = query->value(3).toString();
+        QString str=id+"    "+name+"    "+score+"    "+ classs;
+
+        ui->textBrowser->append(str);
+
+    }
+
+
+
+}
+
+
+void Widget::on_clearData_clicked()
+{
+    ui->textBrowser->clear();
+   // query->clear();
+}
+
+void Widget::on_addData_clicked()
+{
+     ui->textBrowser->clear();
+
+   //  query->exec("INSERT INTO students (name, score,class) "
+    //                "VALUES ('lai', 0, '3-3')");
+
+     query->exec(QString("INSERT INTO students (name, score,class) VALUES('%1','%2','%3') ").arg(QStringLiteral("路飞")).arg(qrand() % 101).arg(qrand() % 10));
+
+     query->exec("SELECT * FROM students");
+    while(query->next())
+    {
+        QString id = query->value(0).toString();
+        QString name = query->value(1).toString();
+        QString score = query->value(2).toString();
+        QString classs = query->value(3).toString();
+        QString str=id+"    "+name+"    "+score+"    "+ classs;
+
+        ui->textBrowser->append(str);
+
+    }
+}
+
+void Widget::on_openFile_clicked()          //打开文件
+{
+     QString filepath=QFileDialog::getOpenFileName(this,"D:/Qt/Sqlist/build-sqlist-Desktop_Qt_5_9_9_MSVC2015_64bit-Debug/yc.db");
+     QSqlQuery sql(filepath);
+     if (!db.open()) {
+            QMessageBox::warning(nullptr, QObject::tr("Database Error"),
+                                 db.lastError().text());
+           // return false;
+     }
+      ui->textBrowser->clear();
+
+       sql.exec("SELECT * FROM students");
+         while(sql.next())
+         {
+             QString id = sql.value(0).toString();
+             QString name = sql.value(1).toString();
+             QString score = sql.value(2).toString();
+             QString classs =sql.value(3).toString();
+             QString str=id+"    "+name+"    "+score+"    "+ classs;
+             ui->textBrowser->append(str);
+             qDebug()<<id<<name<<score<<classs;
+         }
+
+}
+
+void Widget::on_initbtn_clicked()
+{
+
+      ui->textBrowser->clear();
+    query->exec("DROP TABLE students");
+    db.setDatabaseName("D:/Qt/Sqlist/build-sqlist-Desktop_Qt_5_9_9_MSVC2015_64bit-Debug/yc.db");
+    if (!db.open()) {
+           QMessageBox::warning(nullptr, QObject::tr("Database Error"),
+                                db.lastError().text());
+           return ;
+    }
+    query->exec("CREATE TABLE students ("                             //创建一个students表,标题分别为id、name、score、class
+                       "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                       "name VARCHAR(40) NOT NULL, "
+                       " score INTEGER NOT NULL, "
+                       "class VARCHAR(40) NOT NULL)");
+
+   // query->exec("DELETE FROM students");
+//    query->exec("INSERT INTO students (name, score,class) "           //向students表里的(name, score,class)标题下插入一项数据'小张', 85, '初2-1班'
+//                   "VALUES ('yang', 85, '2-1')");
+//    query->exec("INSERT INTO students (name, score,class) "
+//                   "VALUES ('tan', 14, '2-3')");
+//    query->exec("INSERT INTO students (name, score,class) "
+//                   "VALUES ('lai', 0, '3-4')");
+     query->exec(QString("INSERT INTO students (name, score,class) VALUES('%1','%2','%3') ")
+                 .arg(QStringLiteral("谭威")).arg(qrand() % 101).arg(qrand() % 10));
+     query->exec(QString("INSERT INTO students (name, score,class) VALUES('%1','%2','%3') ")
+                 .arg(QStringLiteral("赖继发")).arg(qrand() % 101).arg(qrand() % 10));
+     query->exec(QString("INSERT INTO students (name, score,class) VALUES('%1','%2','%3') ")
+                 .arg(QStringLiteral("卡卡西")).arg(qrand() % 101).arg(qrand() % 10));
+
+
+
+}
+
+void Widget::on_saveBtn_clicked()
+{
+
+//    QFile filename("D:/Qt/Sqlist/build-sqlist-Desktop_Qt_5_9_9_MSVC2015_64bit-Debug/yc.db");
+//      QString str;
+//    for (int i = 0; i < m_model->rowCount(); ++i) {
+//           query->next();
+//           query->addBindValue(m_model->data(m_model->index(i,0)).toInt());
+//           query->addBindValue(m_model->data(m_model->index(i,1)).toString());
+//           query->addBindValue(m_model->data(m_model->index(i,2)).toInt());
+//           query->addBindValue(m_model->data(m_model->index(i,3)).toString());
+
+//                qDebug()<<"=================";
+
+
+//         }
+
+//    if (!filename.open(QFile::WriteOnly)) {
+//        //qDebug()<<"cannot open file:"<<filepath;
+//        return ;
+//    }
+
+//    if (!db.open()) {
+//           QMessageBox::warning(nullptr, QObject::tr("Database Error"),
+//                                db.lastError().text());
+//            qDebug()<<"-------=";
+//           return ;
+//    }
+//        query->exec("SELECT * FROM students");
+//      while( query->next())
+//      {
+//          QString id =  query->value(0).toString();
+//          QString name =  query->value(1).toString();
+//          QString score =  query->value(2).toString();
+//          QString classs =  query->value(3).toString();
+//          QString str=id+"    "+name+"    "+score+"    "+ classs;
+//          ui->textBrowser->append(str);
+//          qDebug()<<id<<name<<score<<classs<<"----------------------------------------------------------";
+//      }
+    add->show();
+}
