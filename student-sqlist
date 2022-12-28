@@ -1,0 +1,280 @@
+#include "studialog.h"
+#include "ui_studialog.h"
+#include <QTableView>
+
+
+StuDialog::StuDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::StuDialog)
+
+
+{
+
+    ui->setupUi(this);
+
+    //调用函数创建且打开数据库
+    CreateDatabaseFunc();
+
+    //调用函数创建数据表
+    CreateTableFunc();
+
+    myModel = new QSqlTableModel(this);
+
+
+    ui->comboBoxValue->insertItem(1,"id");
+    ui->comboBoxValue->insertItem(2,"score");
+
+    ui->comboBoxCond->insertItem(1,QStringLiteral("升序"));
+    ui->comboBoxCond->insertItem(2,QStringLiteral("降序"));
+
+
+}
+StuDialog::~StuDialog()
+{
+    delete ui;
+}
+
+void StuDialog::CreateDatabaseFunc()  //创建SQLite数据库
+{
+    //1、添加数据库驱动
+    sqldb = QSqlDatabase::addDatabase("QSQLITE");
+    //2、设置数据库名称
+    sqldb.setDatabaseName("student.db");
+    //3、打开数据库是否成功
+    if(sqldb.open()==true)
+    {
+        QMessageBox::information(0,QStringLiteral("正确"),QStringLiteral("恭喜你，数据库打开成功！"),QMessageBox::Ok);
+    }
+    else
+    {
+        QMessageBox::critical(0,QStringLiteral("错误"),QStringLiteral("数据库打开失败！"),QMessageBox::Ok);
+    }
+}
+
+void StuDialog::CreateTableFunc()     //创建SQLite数据表
+{
+    QSqlQuery que;
+    QString strsql=QString("create table student("
+                           "id int primary key not null,"
+                           "name text not null,"
+                           "score real not null)");
+    if(que.exec(strsql)==false)
+    {
+        QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("数据表创建失败！"),QMessageBox::Ok);
+    }
+    else
+    {
+        QMessageBox::information(0,QStringLiteral("成功"),QStringLiteral("数据表创建成功！"),QMessageBox::Ok);
+    }
+}
+
+void StuDialog::QueryTableFunc()      //执行查询操作
+{
+
+}
+
+void StuDialog::on_pushButtonSort_clicked()
+{
+
+    if(ui->comboBoxValue->currentText()=="id")
+    {
+        if(ui->comboBoxCond->currentText()==QStringLiteral("升序"))
+        {
+
+                myModel->setSort(0,Qt::AscendingOrder );  //升序排列
+                myModel->select();
+                QMessageBox::information(0,"yes","top sort success!",QMessageBox::Ok);
+
+        }
+        else if(ui->comboBoxCond->currentText()==QStringLiteral("降序"))
+        {
+            myModel->setSort(0,Qt::DescendingOrder );   //降序排列
+            myModel->select();
+            QMessageBox::information(0,"yes","low sort success!",QMessageBox::Ok);
+        }
+    }
+    else if(ui->comboBoxValue->currentText()=="score")
+    {
+        if(ui->comboBoxCond->currentText()==QStringLiteral("升序"))
+        {
+
+                myModel->setSort(2,Qt::AscendingOrder );  //升序排列
+                myModel->select();
+                QMessageBox::information(0,"yes","top sort success!",QMessageBox::Ok);
+
+        }
+        else if(ui->comboBoxCond->currentText()==QStringLiteral("降序"))
+        {
+            myModel->setSort(2,Qt::DescendingOrder );   //降序排列
+            myModel->select();
+            QMessageBox::information(0,"yes","low sort success!",QMessageBox::Ok);
+        }
+    }
+
+}
+
+void StuDialog::on_pushButton_INSERT_clicked()
+{
+    QSqlQuery que;
+    int id = ui->lineEdit_ID->text().toUInt();
+    if(id==0)
+    {
+        QMessageBox::critical(this,QStringLiteral("失败"),QStringLiteral("学生的学号不能为0！"),QMessageBox::Ok);
+        return;
+    }
+
+    QString name=ui->lineEdit_NAME->text();
+    if(name=="")
+    {
+        QMessageBox::critical(this,QStringLiteral("失败"),QStringLiteral("学生的姓名不能为空！"),QMessageBox::Ok);
+        return;
+    }
+
+    double score = ui->lineEdit_SCORE->text().toDouble();
+    if(score<0||score>100)
+    {
+        QMessageBox::critical(this,QStringLiteral("失败"),QStringLiteral("分数范围是（0-100）"),QMessageBox::Ok);
+    }
+
+    QString strs = QString("insert into student "
+                           "values(%1,'%2',%3)").arg(id).arg(name).arg(score);
+
+    if(que.exec(strs)==false)
+    {
+        QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("向数据表插入记录失败，请重新检查！"),QMessageBox::Ok);
+    }
+    else
+    {
+        QMessageBox::information(0,QStringLiteral("成功"),QStringLiteral("插入成功！"),QMessageBox::Ok);
+    }
+}
+
+void StuDialog::on_pushButton_DELETE_clicked()
+{
+    QSqlQuery que;
+    int id = ui->lineEdit_ID->text().toInt();
+    QString name=ui->lineEdit_NAME->text();
+    int score = ui->lineEdit_SCORE->text().toInt();
+
+
+
+
+    que.exec("delete FROM student where id = 33");
+
+
+    if(id!=NULL && name ==NULL && score == NULL)
+    {
+        QString str=QString("DELETE FROM student WHERE id = %1").arg(id);
+
+        if(que.exec(str)==false)
+        {
+            QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("ID删除失败！"),QMessageBox::Ok);
+        }
+        else
+        {
+            QMessageBox::information(0,QStringLiteral("成功"),QStringLiteral("ID删除成功！"),QMessageBox::Ok);
+        }
+    }
+    else if(id==0 && name !=NULL && score == 0)
+    {
+        QString str=QString("DELETE FROM student WHERE name = '%1'").arg(name);
+
+        if(que.exec(str)==false)
+        {
+            QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("NAME删除失败！"),QMessageBox::Ok);
+        }
+        else
+        {
+            QMessageBox::information(0,QStringLiteral("成功"),QStringLiteral("NAME删除成功！"),QMessageBox::Ok);
+        }
+    }
+    else if(id==NULL && name ==NULL && score>0&&score<=100)
+    {
+
+            QString str=QString("DELETE FROM student WHERE score = %1").arg(score);
+
+            if(que.exec(str)==false)
+            {
+                QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("SCORE删除失败！"),QMessageBox::Ok);
+            }
+            else
+            {
+                QMessageBox::information(0,QStringLiteral("成功"),QStringLiteral("SCORE删除成功！"),QMessageBox::Ok);
+            }
+    }
+    else if(id==NULL && name ==NULL &&score<0||score>100)
+    {
+        QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("请检查score输入！"),QMessageBox::Ok);
+    }
+    else
+    {
+
+        QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("请检查输入！"),QMessageBox::Ok);
+    }
+
+
+}
+
+void StuDialog::on_pushButton_UPDATE_clicked()
+{
+    QSqlQuery que;
+    int id = ui->lineEdit_ID->text().toInt();
+    QString name=ui->lineEdit_NAME->text();
+    double score = ui->lineEdit_SCORE->text().toDouble();
+
+    QString str=QString("update student set name = '%1',score = '%2' where id = %3").arg(name).arg(score).arg(id);
+
+
+    if(que.exec(str)==false)
+    {
+        QMessageBox::critical(0,QStringLiteral("失败"),QStringLiteral("更新失败！"),QMessageBox::Ok);
+    }
+
+
+}
+
+void StuDialog::on_pushButton_SEARCH_clicked()
+{
+
+    QSqlQuery que;
+    int id = ui->lineEdit_ID->text().toInt();
+    QString name=ui->lineEdit_NAME->text();
+    int score = ui->lineEdit_SCORE->text().toInt();
+
+    QString str;
+    QString whereStr;
+    QString id1=ui->lineEdit_ID->text();            //显示查询的数据
+    QString name1=ui->lineEdit_NAME->text();
+    QString score1 = ui->lineEdit_SCORE->text();
+    if(id!=NULL)
+    {
+        str=QString("select * from student where id =%1").arg(id);
+          whereStr = " id=" + id1 + ";";
+    }
+    else if(name!="")
+    {
+        str=QString("select * from student where name ='%1'").arg(name);
+        whereStr = " name=" + name1 + ";";
+    }
+    else if(score!=NULL)
+    {
+        str=QString("select * from student where score ='%1'").arg(score);
+        whereStr = " score=" + score1 + ";";
+    }
+
+
+       myModel->setTable("student");
+       myModel->setFilter(whereStr);
+       myModel->select();
+
+}
+
+void StuDialog::on_pushButtonShow_clicked()
+{
+    myModel->setTable("student");
+    myModel->select();
+    myModel->setEditStrategy(QSqlTableModel::OnManualSubmit);   //设置编辑策略为手动提交
+    ui->tableView->setModel(myModel);
+    ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);   //自动列宽
+    ui->tableView->setMouseTracking(true); // 设置鼠标追踪,用来显示表格上标签值
+}
