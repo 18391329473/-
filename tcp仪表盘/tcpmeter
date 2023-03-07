@@ -1,0 +1,254 @@
+#include "TcpMeter.h"
+#include <QPushButton>
+#include <QDebug>
+#include <QMessageBox>
+#include <QHostAddress>
+#include <QLabel>
+#include <QJsonObject>
+#include <QRadialGradient>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include<QtEndian>
+
+const  int TcpMeter::radius =150 ;   //半径
+const  int TcpMeter::maxv = 500;
+const  int TcpMeter::minv = 0;
+
+
+
+TcpMeter::TcpMeter(QWidget *parent)
+    : QWidget(parent),
+      Values(0)
+{
+
+     this->resize(500,500);
+
+     tcpSocket =new QTcpSocket(this);
+
+    QPushButton *connectBtn=new QPushButton(this);
+    connectBtn->resize(100,40);
+    connectBtn->setText(QStringLiteral("连接"));
+    connectBtn->move(50,20);
+
+
+
+    connect(connectBtn,&QPushButton::clicked,this,[=](){
+
+        QString ip = "127.0.0.1";
+        QString m_port="8888";
+        qint16 port=m_port.toInt();
+
+        //主动和服务器建立连接
+        tcpSocket->connectToHost(QHostAddress(ip),port);
+        qDebug()<<QStringLiteral("连接成功");
+        connectBtn->setEnabled(false);
+
+        connect(tcpSocket,&QTcpSocket::readyRead,[=](){
+            //获取对方发送的内容
+            dealData();
+            qDebug()<<QStringLiteral("接收成功");
+        });
+    });
+}
+
+
+void TcpMeter::dealData()
+{
+    unsigned int totalBytes = 0;        //存取包头
+    unsigned int recvBytes = 0;         //存取当前接收的字节数
+
+    QByteArray block;
+    block.resize(0);
+    //存取包头对应的数据块
+
+    //先判断是否有数据
+    if(tcpSocket->bytesAvailable()==0)         //返回读缓冲区里有多少个字节可以读
+    {
+        qDebug()<<QStringLiteral("数据为空！");
+        return;
+    }
+    //如果有数据，先读包头
+    if(tcpSocket->bytesAvailable()>=sizeof(int))        //大于4个字节
+    {
+        QByteArray head=tcpSocket->read(sizeof(int));       //读包头，所以最大字节数是4
+        totalBytes=*(int*)head.data() ;        //转成小端   取出head对象的字符串（得到char*字符串） 转成int*类型并解引用   （判断终端默认是大端存储还是小端存储）
+        qDebug()<<"length:"<<totalBytes;
+    }
+    else{
+        return;
+    }
+    //读数据块
+    while(totalBytes-recvBytes>0 && tcpSocket->bytesAvailable())
+    {
+        block.append(tcpSocket->read(totalBytes-recvBytes));
+        recvBytes=block.size();
+    }
+    if(totalBytes==recvBytes)
+    {
+        QJsonDocument jsonDoc=QJsonDocument::fromJson(block);
+        if(jsonDoc.isObject())
+        {
+            QJsonObject jsonObject=jsonDoc.object();
+            setvalues(jsonObject["value"].toInt());
+            qDebug()<<"sevalue()="<<jsonObject["value"].toInt();
+        }
+    }
+    //如果还有数据，继续读下一个数据包
+    if(tcpSocket->bytesAvailable()>0)
+    {
+       // qDebug()<<"return~~~~~~~";
+        dealData();
+    }
+}
+
+TcpMeter::~TcpMeter()
+{
+}
+
+void TcpMeter::setvalues(qreal iValues)
+{
+    Values = iValues;
+    update();
+}
+
+void TcpMeter::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QPoint center(width()/2,height()/2);            //获取窗口的中心位置
+    painter.save();
+    
+
+
+    QRadialGradient gradient1;//径向渐变
+    gradient1.setCenter(0,0);//中心点
+    gradient1.setFocalPoint(0,0);//焦点中心
+    gradient1.setRadius(radius);//渐变半径
+    gradient1.setColorAt(0.0, "#00ffff");//起始
+    gradient1.setColorAt(0.98, "#1e90ff");//结束
+    gradient1.setColorAt(0.99, "#ffffff");//大边框
+    gradient1.setColorAt(1.0, "#40E0D0");//外边框
+
+
+
+    //绘制背景圆形
+    painter.translate(center);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(gradient1);    //背景颜色
+
+    const int bkRadius=radius+3;    //设置背景半径
+    painter.drawEllipse(QPoint(),bkRadius,bkRadius);
+
+//    QLabel *showLabel=new QLabel(this);
+//    showLabel->resize(70,30);
+//    showLabel->move(width()/2,height()/2-30);
+//    showLabel->setText("123");
+//    showLabel->setParent(painter);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //绘制刻度线
+    painter.rotate(-135);
+    const int longstep = 10;    //设置步长
+    const int shortstep = 50;   //每个隔50
+
+    for(int i=0;i<=shortstep;i++)
+    {
+//        //前面80%刻度线为绿色，后面20%刻度为红色
+        painter.setPen((i<shortstep*0.8)?QColor(32,243,32):QColor(243,32,32));
+
+        if(i%(shortstep/longstep)!=0)       //画短刻度线
+        {
+            QPoint p1(0,-(radius-8));
+            QPoint p2(0,-radius);
+            painter.drawLine(p1,p2);
+        }
+        else                                //画长刻度线
+        {
+            QPoint p1(0,-(radius-20));
+            QPoint p2(0,-radius);
+            painter.drawLine(p1,p2);
+        }
+        painter.rotate(270.0/shortstep);
+    }
+    //绘制表盘名称和背景矩形
+    painter.restore();
+    QFontMetrics fm = painter.fontMetrics();
+    int tx=center.x();
+    int ty=int(center.y()+(radius/1.4142));
+
+    QString title=QStringLiteral("仪表盘");
+//    QString title="0";
+//    title=array;
+    QSize tsz=fm.size(0,title);             //返回文本像素大小
+    QRect trect(QPoint(tx-tsz.width()/2,ty-tsz.height()/2),tsz);
+    painter.setPen(QColor(127,127,127));
+    painter.setBrush(QColor(163,163,163));
+    painter.drawRoundRect(trect.adjusted(-6,-4,6,4),3,3);
+    painter.setPen(QColor(243,243,243));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawText(trect,title);  //绘制每一个长刻度对应的文字
+    painter.setPen(QColor(243,243,243));
+    const int hand=radius-21;
+
+    for(int i=0;i<=longstep;i++)
+    {
+        qreal angle=qDegreesToRadians(-135.0+i*(270.0/longstep));          //每一大格的刻度
+        QString etext=QString::number(minv+i*(maxv-minv)/longstep);
+        QPointF dirvec(qSin(angle),-qCos(angle));
+        QPointF ecenter(center.x()+hand*dirvec.x(),center.y()+hand*dirvec.y()); //根据中心坐标绘制长度对应的汉字
+        QSize esz=fm.size(0,etext);             //设置大小
+        QRectF erect(QPointF(ecenter.x()-esz.width()/2,ecenter.y()-esz.height()/2),esz);
+        painter.drawText(erect,etext);
+
+    }
+
+    //仪表盘指针绘制
+    painter.save();
+    QPoint triangle[]={
+        {-5,0},                 //坐标
+        {0,25-radius},
+        {5,0}
+    };
+
+ //   qreal degree= -135.0+270.0*(Values-minv)/(maxv-minv);
+    double x=(double)270/maxv;
+    qreal degree= -135.0+x*Values;
+    painter.translate(center);
+    painter.rotate(degree);     //旋转
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Qt::red);
+    painter.drawPolygon(triangle,3);        //多边形三个角
+    painter.setPen(QPen(QColor(214,0,0),2));
+    painter.drawEllipse(QPoint(),7,7);
+
+    painter.restore();
+
+}
+
+
+void TcpMeter::resizeEvent(QResizeEvent *event)
+{
+//    qDebug()<<"123";
+//    //设置渐变时，需要结合外形
+//    QRadialGradient gradient1;//径向渐变
+//    gradient1.setCenter(rect().center());//中心点
+//    gradient1.setFocalPoint(rect().center());//焦点中心
+//    gradient1.setRadius((width(), height()) / 2);//渐变半径
+//    gradient1.setColorAt(0.0, "#505b61");//起始
+//    gradient1.setColorAt(0.98, "#2b3337");//结束
+//    gradient1.setColorAt(0.99, "#ffffff");//大边框
+//    gradient1.setColorAt(1.0, "#2b3337");//外边框
+}
+
