@@ -1,0 +1,119 @@
+#include "serverwidget.h"
+#include "ui_serverwidget.h"
+#include <QLineEdit>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QtEndian>
+
+int max=500;
+int min=0;
+int  value=min;
+ServerWidget::ServerWidget(QWidget *parent) :
+    QWidget(parent),
+    ui(new Ui::ServerWidget)
+{
+    ui->setupUi(this);
+    tcpServer = NULL;
+    tcpSocket = NULL;
+    timer = new QTimer(this);
+
+    ui->closeButton->setEnabled(false);
+
+
+    //监听套接字
+    tcpServer = new QTcpServer(this);
+
+    //监听
+    tcpServer->listen(QHostAddress::LocalHost,8888);
+    setWindowTitle(QStringLiteral("服务端"));
+
+    //如果客户端成功和服务器连接
+
+    //tcpServer会自动触发 newConnection()
+    connect(tcpServer,&QTcpServer::newConnection,[=](){
+
+        //取出建立好连接的套接字
+        tcpSocket=tcpServer->nextPendingConnection();
+        //  sendData();
+
+        });
+
+
+    connect(timer,&QTimer::timeout,this, [=](){
+        //发送文件
+        sendData();
+    });
+
+}
+
+ServerWidget::~ServerWidget()
+{
+    delete ui;
+}
+
+ void ServerWidget::sendData()
+ {
+
+        if(max>min)
+        {
+            value++;
+            min++;
+        }
+        else{
+            value--;
+            if(value==0)
+            {
+                min=0;
+            }
+        }
+
+        QJsonObject json;
+        json["value"]=value;
+        QJsonDocument jsonDoc;
+        jsonDoc.setObject(json);
+        QByteArray array=jsonDoc.toJson();
+
+        int len=array.size();      //转换类型  (返回字节数组中的字节数)
+        QByteArray data((char*)&len,4);     //长度转换成char*类型 (发送的数据）
+        data.append(array);                  //存进读取的内容
+        tcpSocket->write(data);
+
+
+//        QString a=QString::number(value,10);
+ //        tcpSocket->write(a.toUtf8().data());
+
+        qDebug()<<data<<"--------";
+        qDebug()<<QStringLiteral("发送成功");
+
+ }
+
+
+void ServerWidget::on_sendButton_clicked()
+{
+    if(NULL==tcpSocket)
+    {
+        qDebug()<<QStringLiteral("请打开连接");
+        return;
+    }
+    ui->sendButton->setEnabled(false);
+    ui->closeButton->setEnabled(true);
+
+    //给对方发送数据，使用套接字是tcpSocket
+    timer->start(80);
+
+}
+
+void ServerWidget::on_closeButton_clicked()
+{
+//    //断开客户端端口
+//    if(NULL==tcpSocket)
+//    {
+//        return;
+//    }
+    ui->sendButton->setEnabled(true);
+    ui->closeButton->setEnabled(false);
+    timer->stop();
+//        tcpSocket->disconnectFromHost();
+//        tcpSocket->close();
+//        tcpSocket=NULL;
+}
