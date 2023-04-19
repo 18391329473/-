@@ -1,0 +1,940 @@
+#pragma execution_character_set("utf-8")
+
+#include "wavechart.h"
+#include "smoothcurve.h"
+#include "qpainter.h"
+#include "qpainterpath.h"
+#include "qdebug.h"
+#include <QDialog>
+
+WaveChart::WaveChart(QWidget *parent) : QWidget(parent),m_active_point(nullptr) ,m_MousePressed(false),mypoint(new myPoint(this))
+{
+
+    if(m_pointsData.isEmpty())                                              //active point
+    {
+        m_pointsData=mypoint->getACtivePoint();
+    }
+
+    minValue = 0;
+    maxValue = 5000;
+    b_minValue = 0;
+    b_maxValue = 500;
+
+    xStep = 1000;
+    yStep = 20;
+
+    space = 40;
+    title = "曲线图";
+    smoothType = 0;
+
+    showHLine = true;
+    showPoint = true;
+    showPointBg = true;
+
+    showLine = false;
+
+//    bgColorStart = QColor(79, 79, 79);
+//    bgColorEnd = QColor(51, 51, 51);
+    bgColorStart = QColor(0, 0, 0);
+    bgColorEnd = QColor(10, 10, 10);
+
+    textColor = QColor(250, 250, 250);
+    pointColor = QColor(38, 114, 179);
+
+    QWidget::setMouseTracking(true);
+
+}
+
+
+void WaveChart::mouseMoveEvent(QMouseEvent *e)
+{
+
+
+    cur=e->pos();
+    if(!pointRect.contains(e->pos()))
+    {
+        return;
+    }
+    if(cur.x()<space ||cur.x()>pointRect.topRight().x()-space/2 || cur.y()<space ||cur.y() >pointRect.bottomLeft().y())
+    {
+        showLine = false;
+    }
+    else{
+        showLine = true;
+    }
+
+    if(m_MousePressed && m_active_point)
+    {
+
+        int move_y=e->pos().y()-m_PressPosition.y();
+        m_active_point->setY(m_active_point->y()+move_y);
+        if(e->y()<space)
+        {
+              m_active_point->setY(space);
+        }
+        else if(e->y()>pointRect.bottomLeft().y())
+        {
+            m_active_point->setY(pointRect.bottomLeft().y());
+        }
+
+        m_PressPosition = e->pos();
+
+    }
+    else
+    {
+        m_active_point = nullptr;
+//        for(QPoint &p : m_pointsData)
+//        {
+//            QRect rect(p.x() - 15, p.y() - 15, 25, 20);
+//            if (rect.contains(e->pos())) {
+//               m_active_point = &p;
+//                break;
+//            }
+//        }
+        for(int i=0;i<m_pointsData.count();i++)
+        {
+            QRect rect(m_pointsData.at(i).x() - 15, m_pointsData.at(i).y() - 15, 25, 20);
+            if (rect.contains(e->pos()))
+            {
+                m_active_point = (QPoint *) &m_pointsData.at(i);
+                break;
+            }
+        }
+
+    }
+
+    if(m_MousePressed && !m_active_point)
+    {
+        QPoint currentPt = e->pos();
+        double dist = m_PressPosition.x() - currentPt.x();
+        emit signalScroll(1.0 * dist / pointRect.bottomRight().x());
+        m_PressPosition = currentPt;
+    }
+
+     update();
+     QWidget::mouseMoveEvent(e);
+}
+
+
+void WaveChart::mousePressEvent(QMouseEvent *e)
+{
+
+    QWidget::mousePressEvent(e);
+    m_MousePressed = true;
+    m_PressPosition = e->pos();
+//    m_active_point = nullptr;
+
+}
+
+void WaveChart::mouseReleaseEvent(QMouseEvent *e)
+{
+    QWidget::mouseReleaseEvent(e);
+    Q_UNUSED(e);
+    m_MousePressed = false;
+
+    m_PressPosition.setX(0);
+    m_PressPosition.setY(0);
+//    m_active_point = nullptr;
+}
+
+void WaveChart::wheelEvent(QWheelEvent *event)
+{
+
+    QPoint numDegrees;                                     // 定义指针类型参数numDegrees用于获取滚轮转角
+    numDegrees = event->angleDelta();                      // 获取滚轮转角
+    int step = 0;                                          // 设置中间参数step用于将获取的数值转换成整数型
+    if (!numDegrees.isNull())                              // 判断滚轮是否转动
+    {
+        step = numDegrees.y();                             // 将滚轮转动数值传给中间参数step
+    }
+    qDebug()<<step<<"==step";
+    event->accept();                                       // 获取事件
+//    int currentWidth = b_maxValue;                         // 获取当前图像的宽
+//    int currentHeight = maxValue;                          // 获取当前图像的高
+//    currentWidth += step;                                  // 对当前图像的高累加
+//    currentHeight += step;
+
+    if (step > 0)                                          // 判断图像是放大还是缩小
+    {
+        maxValue-=500;
+        b_maxValue+=10;
+    }
+    else
+    {
+        maxValue+=500;
+        b_maxValue-=10;
+    }
+    update();
+}
+
+
+void WaveChart::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    QWidget::mouseDoubleClickEvent(e);
+    if(m_active_point)
+    {
+       QDialog dialog;
+       dialog.exec();
+    }
+
+}
+
+void WaveChart::paintEvent(QPaintEvent *)
+{
+    //绘制准备工作,启用反锯齿
+    QPainter painter(this);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
+
+    //计算点绘制区域
+    QPointF topLeftPot(40, space);
+    QPointF bottomRightPot(width()  - space / 2, height() - space );
+    pointRect = QRectF(topLeftPot, bottomRightPot);
+    emit signalTopLeft(mapToGlobal(QPoint(40,space)));
+    //移除超出区域的点
+    int count = pointRect.width() / yStep;
+    int i = listData.count() - count;
+    if (i > 0) {
+        listData.remove(count, i);
+    }
+
+    int j=listPointData.count()-20;
+    if (j > 0) {
+        listPointData.remove(20, j);
+    }
+
+
+    //绘制背景
+    drawBg(&painter);
+    //绘制盒子
+    drawBox(&painter);
+    //绘制文字
+    drawText(&painter);
+    //绘制标题
+    drawTitle(&painter);
+    //绘制数据点
+    drawPoint(&painter);
+
+    drawLine(&painter);
+
+    drawLocation(&painter);
+}
+
+void WaveChart::drawBg(QPainter *painter)
+{
+    painter->save();
+    painter->setPen(Qt::NoPen);
+    QLinearGradient topGradient(rect().topLeft(), rect().bottomLeft());
+    topGradient.setColorAt(0.0, bgColorStart);
+    topGradient.setColorAt(1.0, bgColorEnd);
+    painter->setBrush(topGradient);
+    painter->drawRect(rect());
+    painter->restore();
+}
+
+void WaveChart::drawBox(QPainter *painter)
+{
+    painter->save();
+
+    painter->setPen(textColor);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(pointRect);
+
+    //绘制横线
+    if (showHLine) {
+        QPen pen(textColor, 0.3, Qt::SolidLine);
+        painter->setPen(pen);
+
+//        int step = (maxValue - minValue) / xStep;
+        int step = 5;
+        double increment = (double)pointRect.height() / step;
+
+        emit signalIncrement(increment);
+        double startY = pointRect.topLeft().y();
+        for (int i = 0; i < step - 1; ++i) {
+            startY += increment;
+            QPointF leftPot(pointRect.topLeft().x(), startY);
+            QPointF rightPot(pointRect.topRight().x(), startY);
+            painter->drawLine(leftPot, rightPot);
+        }
+    }
+
+    //绘制shu line
+    if (showHLine) {
+        QPen pen(textColor, 0.3, Qt::SolidLine);
+        painter->setPen(pen);
+
+//        int step = (b_maxValue - b_minValue) / yStep;
+        int step = 25;
+        double increment = (double)pointRect.width() / step;
+        double startX = pointRect.topLeft().x();
+
+        for (int i = 0; i < step - 1; ++i) {
+            startX += increment;
+            QPointF topPot(startX,pointRect.topLeft().y());
+            QPointF bottomPot(startX,pointRect.bottomLeft().y());
+            painter->drawLine(topPot, bottomPot);
+        }
+    }
+
+
+    painter->restore();
+}
+
+void WaveChart::drawText(QPainter *painter)
+{
+    painter->save();
+
+    painter->setPen(textColor);
+    painter->setBrush(Qt::NoBrush);
+
+
+//    int step = (maxValue - minValue) / xStep;           //shu zuobiao
+//    int value = maxValue;
+//    double increment = (double)pointRect.height() / step;
+//    double startY = pointRect.topLeft().y();
+//    QString text;
+
+//    for (int i = 0; i <= step; ++i) {
+//        text = QString("%1").arg(value);
+//#if (QT_VERSION >= QT_VERSION_CHECK(5,11,0))
+//        double textWidth = fontMetrics().horizontalAdvance(text);
+//#else
+//        double textWidth = fontMetrics().width(text);
+//#endif
+//        double textHeight = fontMetrics().height();
+//        QPointF textPot(pointRect.topLeft().x() - 5 - textWidth, startY + textHeight / 2);
+//        painter->drawText(textPot, text);
+//        value -= xStep;
+//        startY += increment;
+//    }
+
+//    int step1 = (b_maxValue - b_minValue) / yStep;           //heng zuobiao
+    int step =25;
+    int value = b_minValue;
+    double increment = (double)pointRect.width() / step;
+    double startX = pointRect.bottomLeft().x();
+    QString text1;
+
+    for (int i = 0; i <= step; ++i) {
+        text1 = QString("%1nm").arg(value);
+#if (QT_VERSION >= QT_VERSION_CHECK(5,11,0))
+        double textWidth1 = fontMetrics().horizontalAdvance(text1);
+#else
+        double textWidth1 = fontMetrics().width(text1);
+#endif
+        double textHeight1 = fontMetrics().height();
+        QPointF textPot1(startX - textWidth1 / 2,pointRect.bottomRight().y() + 5 + textHeight1);
+        painter->drawText(textPot1, text1);
+        int step_x = b_maxValue / step;
+        value += step_x;
+        startX += increment;
+    }
+
+
+    if(showLine)
+    {
+        QPen pen(Qt::white,1,Qt::DashLine);
+        painter->setPen(pen);
+        painter->drawLine(pointRect.topLeft().x(),cur.y(),pointRect.topRight().x(),cur.y());
+        painter->drawLine(cur.x(),pointRect.topLeft().y(),cur.x(),pointRect.bottomRight().y());
+    }
+
+   painter->restore();
+}
+
+void WaveChart::drawTitle(QPainter *painter)
+{
+    painter->save();
+
+    painter->setPen(textColor);
+    painter->setBrush(Qt::NoBrush);
+
+    double titleX = (double)width() / 2;
+    double titleY = space;
+#if (QT_VERSION >= QT_VERSION_CHECK(5,11,0))
+    double textWidth = fontMetrics().horizontalAdvance(title);
+#else
+    double textWidth = fontMetrics().width(title);
+#endif
+    double textHeight = fontMetrics().height();
+
+    //标题加粗显示
+    QFont titleFont;
+    titleFont.setBold(true);
+    titleFont.setPixelSize(13);
+    painter->setFont(titleFont);
+
+    QPointF textPot(titleX - textWidth / 2, titleY / 2 + textHeight / 2);
+    painter->drawText(textPot, title);
+
+    painter->restore();
+}
+
+void WaveChart::drawPoint(QPainter *painter)
+{
+    painter->save();
+
+//    double startX = pointRect.topRight().x();
+//    double startX = pointRect.topLeft().x();
+    double startX = space;
+    points.clear();
+    pl_1.clear();
+    pl_2.clear();
+//    QVector<QPointF> points;
+    QVector<QPointF> redPoints;
+    QVector<QPointF> yelPoints;
+
+    if (showPointBg) {
+        points.push_back(QPointF(startX, pointRect.bottomRight().y()));
+
+
+    }
+    if(listData.isEmpty())                                              //active point
+    {
+        listData=mypoint->getElevPoint();
+        update();
+    }
+
+
+    for (int i = 0; i < listData.count(); ++i) {
+
+//        QPointF dataPot(startX, pointRect.bottomRight().y() - (double)listData.at(i) * (pointRect.height() / (maxValue - minValue)));
+
+        double y_data=pointRect.height()-(listData.at(i) * pointRect.height() / maxValue)+space;
+        QPointF dataPot(startX, y_data);
+        points.push_back(dataPot);
+        redPoints.push_back(QPointF(startX,y_data-150));
+        yelPoints.push_back(QPointF(startX,y_data-300));
+        int step_y= b_maxValue / 25;
+        startX +=step_y;
+        //        startX -= yStep;
+    }
+    for(int i=0;i<redPoints.count();i++)
+    {
+        pl_1.push_back(redPoints.at(i));
+        pl_2.push_back(yelPoints.at(i));
+    }
+
+    if (showPointBg) {
+        points.push_back(QPointF(startX, pointRect.bottomRight().y()));
+    }
+
+    //如果只有两个数据点不需要处理
+    if (showPointBg && points.count() <= 2) {
+        painter->restore();
+        return;
+    }
+
+    painter->setPen(pointColor);
+
+    if (showPointBg) {
+//        painter->setBrush(QColor(pointColor.red(), pointColor.green(), pointColor.blue(), 150));
+        painter->setBrush(QColor(255,165,0));
+        if (smoothType == 0) {
+            painter->drawPolygon(QPolygonF(points));
+
+        }
+    } else {
+        painter->setBrush(Qt::NoBrush);
+        if (smoothType == 0) {
+            painter->drawPolyline(QPolygonF(points));
+
+        }
+    }
+    painter->setBrush(Qt::transparent);
+
+
+    for(int i=1;i<pl_1.count();i++)
+    {
+        QPen pen(Qt::red,2,Qt::SolidLine);
+        painter->setPen(pen);
+        painter->drawLine(pl_1[i],pl_1[i-1]);
+        QPen pen1(Qt::yellow,2,Qt::SolidLine);
+        painter->setPen(pen1);
+        painter->drawLine(pl_2[i],pl_2[i-1]);
+    }
+//    qDebug()<<pl_1.count()<<"--";
+
+//    QMatrix matrix;
+
+//    matrix.scale(1,0.7);
+//    pl_1 = matrix.map(QPolygonF(points));
+//    pl_1[0].setY(points[0].y());
+//    pl_1.last().setY(points[0].y());
+
+//    painter->setPen(Qt::red);
+//    for (int i = 1; i < pl_1.count() - 1; ++i) {
+//        painter->drawLine(pl_1[i], pl_1[i + 1]);
+//    }
+
+//    matrix.scale(1, 0.7);
+//    pl_2 = matrix.map(QPolygonF(points));
+//    pl_2[0].setY(points[0].y());
+//    pl_2.last().setY(points[0].y());
+
+//    painter->setPen(Qt::yellow);
+//    for (int i = 1; i < pl_2.count() - 1; ++i) {
+//        painter->drawLine(pl_2[i], pl_2[i + 1]);
+//    }
+
+    if (showPoint) {
+           for (int i = 0; i < m_pointsData.count(); i++) {
+               QPointF dataPot = m_pointsData.at(i);
+               QPoint triangle[]={    //坐标数组
+                      {(int)dataPot.x()-10,(int)dataPot.y()+10},
+                      {(int)dataPot.x(),(int)dataPot.y()-15},
+                      {(int)dataPot.x()+10,(int)dataPot.y()+10}
+                  };
+               QPen pen;
+               pen.setWidth(3);
+               pen.setStyle(Qt::SolidLine);
+               pen.setColor(Qt::yellow);
+              painter->setPen(pen);
+              painter->drawPolygon(triangle,3);        //根据三个坐标绘制多边形
+           }
+       }
+    if (m_active_point){
+
+           painter->setBrush(Qt::yellow);
+           QPoint triangle[]={    //坐标数组
+                  {m_active_point->x()-10,m_active_point->y()+10},
+                  {m_active_point->x(),m_active_point->y()-15},
+                  {m_active_point->x()+10,m_active_point->y()+10}
+              };
+           painter->drawPolygon(triangle,3);        //根据三个坐标绘制多边形
+       }
+
+
+
+    //绘制平滑曲线
+    if (smoothType == 1) {
+        QPainterPath path = SmoothCurve::createSmoothCurve(points);
+        painter->drawPath(path);
+    } else if (smoothType == 2) {
+        QPainterPath path = SmoothCurve::createSmoothCurve2(points);
+        painter->drawPath(path);
+    }
+
+    //绘制坐标点
+//    if (showPoint) {
+//        for (int i = 0; i < points.count(); ++i) {
+//            QPointF dataPot = points.at(i);
+//            painter->setBrush(pointColor);
+//            painter->drawEllipse(dataPot, 3, 3);
+//        }
+//    }
+
+
+    for(int i=1;i<points.count();i++)
+    {
+        QLineF line1(cur,QPoint(cur.x(),pointRect.bottomRight().y()));
+        QLineF line2(points.at(i),points.at(i-1));
+        QPointF interPos(0,0);
+        QLineF::IntersectType type = line1.intersect(line2, &interPos);
+        if (type != QLineF::BoundedIntersection)
+        {
+            continue;
+        }
+        elevPoint=interPos;
+    }
+    qDebug()<<"123";
+    painter->restore();
+}
+
+void WaveChart::drawLine(QPainter *painter)
+{
+    painter->save();
+    QPen pen;
+    int m=1;
+    for(int i=1;i<m_pointsData.count();i++)
+    {
+
+        bool isYelSect=false;
+        bool isRedSect=false;
+
+        for (int k=m; k < pl_1.count() - 1; k++)
+        {
+            isRedSect = haveSectPoint(m_pointsData[i-1],m_pointsData[i],pl_1[k-1],pl_1[k]);
+
+            if(isRedSect)
+            {
+                QPen pen(Qt::red,2,Qt::SolidLine);
+                painter->setPen(pen);
+                painter->drawLine(m_pointsData[i-1],m_pointsData[i]);
+                m=k;
+                break;
+            }
+        }
+
+        if(isRedSect)
+        {
+            continue;
+        }
+
+        for (int k=m; k < pl_2.count() - 1; k++)
+        {
+            isYelSect = haveSectPoint(m_pointsData[i-1],m_pointsData[i],pl_2[k-1],pl_2[k]);
+            if(isYelSect)
+            {
+                QPen pen(Qt::yellow,2,Qt::SolidLine);
+                painter->setPen(pen);
+                painter->drawLine(m_pointsData[i-1],m_pointsData[i]);
+                m=k;
+                break;
+            }
+        }
+
+        bool sectRed = false;
+        bool sectYel = false;
+        if(!isYelSect && !isRedSect)
+        {
+            QPoint point_x(m_pointsData[i].x(),pointRect.bottomRight().y());
+            int n=1;
+            for (int j = n; j < pl_1.count() - 1; j++)
+            {
+                if(haveSectPoint(point_x,m_pointsData[i],pl_1[j-1],pl_1[j]))
+                {
+                    n=j;
+                    sectRed = true;
+                }
+            }
+            if(!sectRed)
+            {
+                QPen pen(Qt::red,2,Qt::SolidLine);
+                painter->setPen(pen);
+                painter->drawLine(m_pointsData[i-1],m_pointsData[i]);
+
+                continue;
+            }
+
+            for (int j = n; j < pl_2.count() - 1; j++)
+            {
+                if(haveSectPoint(point_x,m_pointsData[i],pl_2[j-1],pl_2[j]))
+                {
+                    sectYel = true;
+                }
+            }
+
+            if(sectYel)
+            {
+                QPen pen(Qt::white,2,Qt::DashLine);
+                painter->setPen(pen);
+                painter->drawLine(m_pointsData[i-1],m_pointsData[i]);
+
+                continue;
+            }
+            else
+            {
+                QPen pen(Qt::yellow,2,Qt::SolidLine);
+                painter->setPen(pen);
+                painter->drawLine(m_pointsData[i-1],m_pointsData[i]);
+
+                continue;
+            }
+        }
+        if(isYelSect )
+        {
+            continue;
+        }
+    }
+    painter->restore();
+}
+
+void WaveChart::drawLocation(QPainter *painter)
+{
+    for(int i=0;i<m_pointsData.count();i++)
+    {
+
+         QString text=QString(" %1,%2 ").arg(m_pointsData[i].x()-40).arg(551-m_pointsData[i].y());
+         double rxx = fontMetrics().width(text);
+         double ryy = fontMetrics().height();
+         painter->setPen(Qt::black);
+         painter->setBrush(Qt::white);
+         QRect textRect(m_pointsData[i].x()+10,m_pointsData[i].y()-ryy,rxx,ryy);
+         painter->drawRect(textRect);
+         painter->drawText(textRect,text);
+
+     }
+     for(int i=1;i<m_pointsData.count();i++)
+     {
+
+         QPoint newPoint_1(m_pointsData.at(i-1).x(),m_pointsData.at(i-1).y()-2);
+         QPoint newPoint_2(m_pointsData.at(i).x(),m_pointsData.at(i).y()-2);
+         QPoint newPoint_3(m_pointsData.at(i).x(),m_pointsData.at(i).y()+2);
+         QPoint newPoint_4(m_pointsData.at(i-1).x(),m_pointsData.at(i-1).y()+2);
+         m_polygon.push_back(newPoint_1);
+         m_polygon.push_back(newPoint_2);
+         m_polygon.push_back(newPoint_3);
+         m_polygon.push_back(newPoint_4);
+
+         QPolygon polygon(m_polygon);
+
+//        painter->drawPolygon(QPolygonF(m_polygon));
+
+        if (polygon.containsPoint(cur,Qt::OddEvenFill))
+        {
+            QString text=QString(" %1,%2 ").arg(cur.x()-space).arg(551-cur.y());
+            double rxx = fontMetrics().width(text);
+            double ryy = fontMetrics().height();
+            painter->setPen(Qt::black);
+            painter->setBrush(Qt::white);
+            QRect textRect(cur.x()+10,cur.y()-ryy,rxx,ryy);
+            painter->drawRect(textRect);
+            painter->drawText(textRect,text);
+
+            QString text_elev=QString(" %1,%2 ").arg(elevPoint.x()-space).arg(551-elevPoint.y());
+            double rxx_elev = fontMetrics().width(text_elev);
+            double ryy_elev = fontMetrics().height();
+            QRect textRect_elev(elevPoint.x()+10,elevPoint.y()-ryy_elev,rxx_elev,ryy_elev);
+            painter->drawRect(textRect_elev);
+            painter->drawText(textRect_elev,text_elev);
+
+            QString text_dis=QString(" %1 ").arg(elevPoint.y()-cur.y());
+            double rxx_dis = fontMetrics().width(text_dis);
+            double ryy_dis = fontMetrics().height();
+            QRect textRect_dis(elevPoint.x()+10,(elevPoint.y()+cur.y())/2-ryy_dis,rxx_dis,ryy_dis);
+            painter->drawRect(textRect_dis);
+            painter->drawText(textRect_dis,text_dis);
+
+            QPen pen(Qt::yellow,2,Qt::SolidLine);           //  draw -->
+            painter->setPen(pen);
+            painter->drawLine(cur,QPointF(elevPoint.x(),elevPoint.y()));
+            painter->drawLine(cur,QPoint(cur.x()-8,cur.y()+8));
+            painter->drawLine(cur,QPoint(cur.x()+8,cur.y()+8));
+            painter->drawLine(QPointF(elevPoint.x(),elevPoint.y()),QPointF(elevPoint.x()-8,elevPoint.y()-8));
+            painter->drawLine(QPointF(elevPoint.x(),elevPoint.y()),QPointF(elevPoint.x()+8,elevPoint.y()-8));
+
+        }
+        m_polygon.clear();
+     }
+}
+
+double WaveChart::getMinValue() const
+{
+    return this->minValue;
+}
+
+double WaveChart::getMaxValue() const
+{
+    return this->maxValue;
+}
+
+double WaveChart::getXStep() const
+{
+    return this->xStep;
+}
+
+double WaveChart::getYStep() const
+{
+    return this->yStep;
+}
+
+double WaveChart::getSpace() const
+{
+    return this->space;
+}
+
+QString WaveChart::getTitle() const
+{
+    return this->title;
+}
+
+int WaveChart::getSmoothType() const
+{
+    return this->smoothType;
+}
+
+bool WaveChart::getShowHLine() const
+{
+    return this->showHLine;
+}
+
+bool WaveChart::getShowPoint() const
+{
+    return this->showPoint;
+}
+
+bool WaveChart::getShowPointBg() const
+{
+    return this->showPointBg;
+}
+
+QColor WaveChart::getBgColorStart() const
+{
+    return this->bgColorStart;
+}
+
+QColor WaveChart::getBgColorEnd() const
+{
+    return this->bgColorEnd;
+}
+
+QColor WaveChart::getTextColor() const
+{
+    return this->textColor;
+}
+
+QColor WaveChart::getPointColor() const
+{
+    return this->pointColor;
+}
+
+QSize WaveChart::sizeHint() const
+{
+    return QSize(500, 300);
+}
+
+QSize WaveChart::minimumSizeHint() const
+{
+    return QSize(200, 70);
+}
+
+bool WaveChart::haveSectPoint(QPointF a , QPointF b , QPointF c , QPointF d)
+{
+    QLineF line1(a,b);
+    QLineF line2(c,d);
+    QPointF interPos(0,0);
+    QLineF::IntersectType type = line1.intersect(line2, &interPos);
+    if (type != QLineF::BoundedIntersection)
+    {
+        return false;
+    }
+    return true;
+}
+
+void WaveChart::addData(double data)
+{
+    listData.append(data);
+    this->update();
+}
+
+void WaveChart::setData(QVector<double> data)
+{
+    listData = data;
+    this->update();
+}
+
+void WaveChart::setPointData(QVector<double> data)
+{
+    listPointData = data;
+    this->update();
+}
+
+void WaveChart::clearData()
+{
+    listData.clear();
+    this->update();
+}
+
+void WaveChart::setMinValue(double minValue)
+{
+    if (this->minValue != minValue) {
+        this->minValue = minValue;
+        this->update();
+    }
+}
+
+void WaveChart::setMaxValue(double maxValue)
+{
+    if (this->maxValue != maxValue) {
+        this->maxValue = maxValue;
+        this->update();
+    }
+}
+
+void WaveChart::setXStep(double xStep)
+{
+    if (this->xStep != xStep) {
+        this->xStep = xStep;
+        this->update();
+    }
+}
+
+void WaveChart::setYStep(double yStep)
+{
+    if (this->yStep != yStep) {
+        this->yStep = yStep;
+        this->update();
+    }
+}
+
+void WaveChart::setSpace(double space)
+{
+    if (this->space != space) {
+        this->space = space;
+        this->update();
+    }
+}
+
+void WaveChart::setTitle(const QString &title)
+{
+    if (this->title != title) {
+        this->title = title;
+        this->update();
+    }
+}
+
+void WaveChart::setSmoothType(int smoothType)
+{
+    if (this->smoothType != smoothType) {
+        this->smoothType = smoothType;
+        this->update();
+    }
+}
+
+void WaveChart::setShowHLine(bool showHLine)
+{
+    if (this->showHLine != showHLine) {
+        this->showHLine = showHLine;
+        this->update();
+    }
+}
+
+void WaveChart::setShowPoint(bool showPoint)
+{
+    if (this->showPoint != showPoint) {
+        this->showPoint = showPoint;
+        this->update();
+    }
+}
+
+void WaveChart::setShowPointBg(bool showPointBg)
+{
+    if (this->showPointBg != showPointBg) {
+        this->showPointBg = showPointBg;
+        this->update();
+    }
+}
+
+void WaveChart::setBgColorStart(const QColor &bgColorStart)
+{
+    if (this->bgColorStart != bgColorStart) {
+        this->bgColorStart = bgColorStart;
+        this->update();
+    }
+}
+
+void WaveChart::setBgColorEnd(const QColor &bgColorEnd)
+{
+    if (this->bgColorEnd != bgColorEnd) {
+        this->bgColorEnd = bgColorEnd;
+        this->update();
+    }
+}
+
+void WaveChart::setTextColor(const QColor &textColor)
+{
+    if (this->textColor != textColor) {
+        this->textColor = textColor;
+        this->update();
+    }
+}
+
+void WaveChart::setPointColor(const QColor &pointColor)
+{
+    if (this->pointColor != pointColor) {
+        this->pointColor = pointColor;
+        this->update();
+    }
+}
+
